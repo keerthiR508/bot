@@ -52,11 +52,25 @@ const uploadResume = async (req, res) => {
       return res.json({ success: true, ...reusedPayload });
     }
 
-    // 1. Save Resume File to Disk
+    // 1. Save Resume File to Disk (Skip if on serverless/read-only)
     const filename = `${req.user._id}_${Date.now()}_${file.originalname}`;
-    const uploadPath = path.join(__dirname, '..', 'uploads', 'resumes', filename);
-    fs.writeFileSync(uploadPath, file.buffer);
-    const resumeFilePath = `/uploads/resumes/${filename}`;
+    const uploadDir = path.join(__dirname, '..', 'uploads', 'resumes');
+    const uploadPath = path.join(uploadDir, filename);
+    let resumeFilePath = '';
+
+    try {
+      // Ensure directory exists (might fail on Vercel)
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      fs.writeFileSync(uploadPath, file.buffer);
+      resumeFilePath = `/uploads/resumes/${filename}`;
+    } catch (fsError) {
+      console.warn("Filesystem is read-only or error writing file. Skipping disk save:", fsError.message);
+      // In production (Vercel), we might not be able to save files. 
+      // We'll set a placeholder or skip the path.
+      resumeFilePath = 'filesystem_restricted';
+    }
 
     // 1. PDF Parsing with Robust Fallback
     console.log("Uploaded File:", file);
