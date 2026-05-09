@@ -20,6 +20,9 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Health Check Route
+app.get('/', (req, res) => res.send('AI Recruitment API is running...'));
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/questions', questionRoutes);
