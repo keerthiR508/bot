@@ -7,8 +7,10 @@ const ResumeScore = require('../models/ResumeScore');
 // @access  Protected (Recruiter)
 const getResults = async (req, res) => {
   try {
-    const companyFilter = req.user.company ? { company: req.user.company.toLowerCase() } : { company: 'none' };
-    const results = await Result.find(companyFilter)
+    const company = req.user.company ? req.user.company.toLowerCase() : 'none';
+    const results = await Result.find({ 
+      company: { $regex: new RegExp("^" + company + "$", "i") } 
+    })
       .populate('candidate', 'name email profileType')
       .sort({ createdAt: -1 });
     res.json(results);
@@ -60,9 +62,10 @@ const getRecruiterCompanies = async (req, res) => {
 // @access  Protected (Recruiter)
 const getResumes = async (req, res) => {
   try {
-    const companyFilter = req.user.company ? { company: req.user.company.toLowerCase() } : { company: 'none' };
-    const resumes = await ResumeScore.find(companyFilter)
-      .sort({ createdAt: -1 });
+    const company = req.user.company ? req.user.company.toLowerCase() : 'none';
+    const resumes = await ResumeScore.find({ 
+      company: { $regex: new RegExp("^" + company + "$", "i") } 
+    }).sort({ createdAt: -1 });
     res.json(resumes);
   } catch (error) {
     res.status(500).json({ message: error.message });

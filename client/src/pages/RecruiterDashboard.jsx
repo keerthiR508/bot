@@ -20,9 +20,11 @@ const RecruiterDashboard = () => {
 
 
   useEffect(() => {
-    if (activeTab === 'results') fetchResults();
+    if (activeTab === 'results' || activeTab === 'resumes') {
+      fetchResults();
+      fetchResumes();
+    }
     if (activeTab === 'questions') fetchQuestions();
-    if (activeTab === 'resumes') fetchResumes();
   }, [activeTab]);
 
   const fetchResults = async () => {
