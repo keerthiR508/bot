@@ -193,7 +193,7 @@ const RecruiterDashboard = () => {
                             onClick={() => {
                               const resume = resumes.find(res => String(res.candidate) === String(r.candidate?._id));
                               if (resume) {
-                                window.open(`http://localhost:5000${encodeURI(resume.resumeFilePath)}`, '_blank');
+                                window.open(`https://bot-c47w.onrender.com${encodeURI(resume.resumeFilePath)}`, '_blank');
                               } else {
                                 alert("Resume file not found for this candidate.");
                               }
@@ -269,7 +269,7 @@ const RecruiterDashboard = () => {
                         </td>
                         <td className="p-4 flex gap-4">
                           <a 
-                            href={`http://localhost:5000${encodeURI(res.resumeFilePath)}`} 
+                            href={`https://bot-c47w.onrender.com${encodeURI(res.resumeFilePath)}`} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-500/20 flex items-center gap-2 transition-all"
@@ -278,7 +278,7 @@ const RecruiterDashboard = () => {
                             Preview
                           </a>
                           <a 
-                            href={`http://localhost:5000${encodeURI(res.resumeFilePath)}`} 
+                            href={`https://bot-c47w.onrender.com${encodeURI(res.resumeFilePath)}`} 
                             download 
                             className="bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-500/20 flex items-center gap-2 transition-all"
                           >
