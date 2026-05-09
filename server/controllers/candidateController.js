@@ -55,7 +55,8 @@ const uploadResume = async (req, res) => {
       return res.json({ success: true, ...reusedPayload });
     }
 
-    const resumeFilePath = `http://localhost:3001/uploads/resumes/${file.filename}`;
+    const baseUrl = process.env.NODE_ENV === 'production' ? 'https://bot-c47w.onrender.com' : 'http://localhost:3001';
+    const resumeFilePath = `${baseUrl}/uploads/resumes/${file.filename}`;
 
 
     // 1. PDF Parsing with Robust Fallback
