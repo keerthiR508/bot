@@ -6,28 +6,6 @@ const ResumeScore = require('../models/ResumeScore');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const cloudinary = require('cloudinary').v2;
-const streamifier = require('streamifier');
-
-// Cloudinary Configuration
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-const uploadToCloudinary = (fileBuffer) => {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      { folder: 'resumes', resource_type: 'auto' },
-      (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
-      }
-    );
-    streamifier.createReadStream(fileBuffer).pipe(uploadStream);
-  });
-};
 
 
 // Predefined keyword list for IT roles
@@ -49,7 +27,9 @@ const uploadResume = async (req, res) => {
 
   try {
     const normalizedCompany = (company || 'None').toLowerCase();
-    const resumeHash = crypto.createHash('sha256').update(file.buffer).digest('hex');
+    const fileBuffer = fs.readFileSync(file.path);
+    const resumeHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
 
     // STRICT RULE: same resume must always return the same stored score.
     const existingScore = await ResumeScore.findOne({
@@ -75,11 +55,7 @@ const uploadResume = async (req, res) => {
       return res.json({ success: true, ...reusedPayload });
     }
 
-    // 1. Upload to Cloudinary
-    console.log("Uploading to Cloudinary...");
-    const cloudinaryResult = await uploadToCloudinary(file.buffer);
-    const resumeFilePath = cloudinaryResult.secure_url;
-    console.log("Cloudinary Upload Success:", resumeFilePath);
+    const resumeFilePath = `http://localhost:3001/uploads/resumes/${file.filename}`;
 
 
     // 1. PDF Parsing with Robust Fallback
@@ -88,7 +64,8 @@ const uploadResume = async (req, res) => {
     let parsingFailed = false;
 
     try {
-      const data = await pdf(file.buffer);
+      const data = await pdf(fileBuffer);
+
       extractedText = data?.text || '';
       console.log("Resume Parse Result:", extractedText.slice(0, 200) + "...");
     } catch (parseError) {

@@ -5,7 +5,7 @@ import App from './App.jsx'
 import axios from 'axios'
 
 // Set global API base URL
-axios.defaults.baseURL = 'https://bot-c47w.onrender.com'
+axios.defaults.baseURL = 'http://localhost:3001'
 
 
 createRoot(document.getElementById('root')).render(

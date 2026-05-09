@@ -206,7 +206,7 @@ const RecruiterDashboard = () => {
                             onClick={() => {
                               const resume = resumes.find(res => String(res.candidate) === String(r.candidate?._id));
                               if (resume) {
-                                setSelectedResumeUrl(resume.resumeFilePath.startsWith('http') ? resume.resumeFilePath : `https://bot-c47w.onrender.com${encodeURI(resume.resumeFilePath)}`);
+                                setSelectedResumeUrl(resume.resumeFilePath.startsWith('http') ? resume.resumeFilePath : `http://localhost:3001${encodeURI(resume.resumeFilePath)}`);
                               } else {
                                 alert("Resume file not found for this candidate.");
                               }
@@ -282,7 +282,7 @@ const RecruiterDashboard = () => {
                         </td>
                         <td className="p-4 flex gap-4">
                           <button 
-                            onClick={() => setSelectedResumeUrl(res.resumeFilePath.startsWith('http') ? res.resumeFilePath : `https://bot-c47w.onrender.com${encodeURI(res.resumeFilePath)}`)}
+                            onClick={() => setSelectedResumeUrl(res.resumeFilePath.startsWith('http') ? res.resumeFilePath : `http://localhost:3001${encodeURI(res.resumeFilePath)}`)}
                             className="bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-500/20 flex items-center gap-2 transition-all"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
