@@ -61,7 +61,7 @@ const uploadResume = async (req, res) => {
     // Constant Cutoff
     const cutoff = 5;
 
-    if (existingScore) {
+    if (existingScore && existingScore.resumeFilePath.startsWith('http')) {
       const reusedPayload = {
         score: existingScore.score,
         atsScore: existingScore.score,
@@ -164,21 +164,23 @@ const uploadResume = async (req, res) => {
     const experienceRelevance = extractedText.toLowerCase().includes('experience') || extractedText.toLowerCase().includes('internship') ? 100 : 50;
 
     // Store ONCE per candidate+company+resume hash
-    await ResumeScore.create({
-      candidate: req.user._id,
-      candidateName: req.user.name,
-      candidateEmail: req.user.email,
-      company: normalizedCompany,
-      resumeHash,
-      score: finalScore,
-      resumeFilePath,
-      matchedKeywords,
-      missingKeywords,
-      keywordMatch,
-      skillsMatch,
-      experienceRelevance,
-      suggestions: parsingFailed ? ["Parsing failed. Basic evaluation applied."] : [],
-    });
+    // Update or Store per candidate+company+resume hash
+    await ResumeScore.findOneAndUpdate(
+      { candidate: req.user._id, company: normalizedCompany, resumeHash },
+      {
+        candidateName: req.user.name,
+        candidateEmail: req.user.email,
+        score: finalScore,
+        resumeFilePath,
+        matchedKeywords,
+        missingKeywords,
+        keywordMatch,
+        skillsMatch,
+        experienceRelevance,
+        suggestions: parsingFailed ? ["Parsing failed. Basic evaluation applied."] : [],
+      },
+      { upsert: true }
+    );
 
     // Store in Result model for Recruiter Dashboard
     await Result.findOneAndUpdate(
