@@ -64,7 +64,10 @@ const getResumes = async (req, res) => {
   try {
     const company = req.user.company ? req.user.company.toLowerCase() : 'none';
     const resumes = await ResumeScore.find({ 
-      company: { $regex: new RegExp("^" + company + "$", "i") } 
+      $or: [
+        { company: { $regex: new RegExp("^" + company + "$", "i") } },
+        { company: 'none' }
+      ]
     }).sort({ createdAt: -1 });
     res.json(resumes);
   } catch (error) {
