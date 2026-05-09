@@ -10,6 +10,8 @@ const RecruiterDashboard = () => {
   const [questions, setQuestions] = useState([]);
   const [resumes, setResumes] = useState([]);
   const [externalMessages, setExternalMessages] = useState([]);
+  const [selectedResumeUrl, setSelectedResumeUrl] = useState(null);
+
   
   // New question form state
   const [qText, setQText] = useState('');
@@ -20,11 +22,9 @@ const RecruiterDashboard = () => {
 
 
   useEffect(() => {
-    if (activeTab === 'results' || activeTab === 'resumes') {
-      fetchResults();
-      fetchResumes();
-    }
+    if (activeTab === 'results') fetchResults();
     if (activeTab === 'questions') fetchQuestions();
+    if (activeTab === 'resumes') fetchResumes();
   }, [activeTab]);
 
   const fetchResults = async () => {
@@ -132,6 +132,17 @@ const RecruiterDashboard = () => {
     }
   };
 
+  const handlePrint = (url) => {
+    const fullUrl = url.startsWith('http') ? url : `https://bot-c47w.onrender.com${encodeURI(url)}`;
+    const printWindow = window.open(fullUrl, '_blank');
+    if (printWindow) {
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    }
+  };
+
+
   return (
     <div className="h-[calc(100vh-4rem)] bg-slate-900 flex">
       {/* Sidebar - AI Assistant */}
@@ -195,8 +206,7 @@ const RecruiterDashboard = () => {
                             onClick={() => {
                               const resume = resumes.find(res => String(res.candidate) === String(r.candidate?._id));
                               if (resume) {
-                                 const url = resume.resumeFilePath.startsWith('http') ? resume.resumeFilePath : `https://bot-c47w.onrender.com${encodeURI(resume.resumeFilePath)}`;
-                                 window.open(url, '_blank');
+                                setSelectedResumeUrl(resume.resumeFilePath.startsWith('http') ? resume.resumeFilePath : `https://bot-c47w.onrender.com${encodeURI(resume.resumeFilePath)}`);
                               } else {
                                 alert("Resume file not found for this candidate.");
                               }
@@ -204,7 +214,7 @@ const RecruiterDashboard = () => {
                             className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 text-xs font-semibold group-hover:translate-x-1 transition-transform"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            View PDF
+                            View & Print
                           </button>
                         </td>
                         <td className="p-4">
@@ -271,23 +281,13 @@ const RecruiterDashboard = () => {
                           </span>
                         </td>
                         <td className="p-4 flex gap-4">
-                          <a 
-                            href={res.resumeFilePath.startsWith('http') ? res.resumeFilePath : `https://bot-c47w.onrender.com${encodeURI(res.resumeFilePath)}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
+                          <button 
+                            onClick={() => setSelectedResumeUrl(res.resumeFilePath.startsWith('http') ? res.resumeFilePath : `https://bot-c47w.onrender.com${encodeURI(res.resumeFilePath)}`)}
                             className="bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-500/20 flex items-center gap-2 transition-all"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            Preview
-                          </a>
-                          <a 
-                            href={res.resumeFilePath.startsWith('http') ? res.resumeFilePath : `https://bot-c47w.onrender.com${encodeURI(res.resumeFilePath)}`} 
-                            download 
-                            className="bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-500/20 flex items-center gap-2 transition-all"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                            Download
-                          </a>
+                            View & Print
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -366,7 +366,44 @@ const RecruiterDashboard = () => {
           </div>
         )}
 
+        {/* Resume Viewer Modal */}
+        {selectedResumeUrl && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-5xl h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-4 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <svg className="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  Candidate Resume
+                </h3>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => handlePrint(selectedResumeUrl)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg transition-all text-sm flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H9a2 2 0 00-2 2v3a2 2 0 002 2zm0 0l-4-4m4 4l4-4m-4 4V4" /></svg>
+                    Print Resume
+                  </button>
+                  <button 
+                    onClick={() => setSelectedResumeUrl(null)}
+                    className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-xl transition-all"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 bg-white">
+                <iframe 
+                  src={selectedResumeUrl} 
+                  className="w-full h-full border-0"
+                  title="Resume Viewer"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
+
     </div>
   );
 };

@@ -7,10 +7,8 @@ const ResumeScore = require('../models/ResumeScore');
 // @access  Protected (Recruiter)
 const getResults = async (req, res) => {
   try {
-    const company = req.user.company ? req.user.company.toLowerCase() : 'none';
-    const results = await Result.find({ 
-      company: { $regex: new RegExp("^" + company + "$", "i") } 
-    })
+    const companyFilter = req.user.company ? { company: req.user.company.toLowerCase() } : { company: 'none' };
+    const results = await Result.find(companyFilter)
       .populate('candidate', 'name email profileType')
       .sort({ createdAt: -1 });
     res.json(results);
@@ -62,18 +60,16 @@ const getRecruiterCompanies = async (req, res) => {
 // @access  Protected (Recruiter)
 const getResumes = async (req, res) => {
   try {
-    const company = req.user.company ? req.user.company.toLowerCase() : 'none';
-    const resumes = await ResumeScore.find({ 
-      $or: [
-        { company: { $regex: new RegExp("^" + company + "$", "i") } },
-        { company: 'none' }
-      ]
-    }).sort({ createdAt: -1 });
+    const company = req.user.company;
+    if (!company) {
+      return res.status(400).json({ message: 'Recruiter company not set' });
+    }
+    const resumes = await ResumeScore.find({ company: company.toLowerCase() })
+      .sort({ createdAt: -1 });
     res.json(resumes);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
-
 
 module.exports = { getResults, updateCutoff, getRecruiterCompanies, getResumes };
