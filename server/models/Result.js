@@ -7,6 +7,7 @@ const resultSchema = new mongoose.Schema({
   score: { type: Number, required: true },
   totalQuestions: { type: Number, required: true },
   status: { type: String, enum: ['Pass', 'Fail'], required: true },
+  reason: { type: String }, // e.g., 'Cheating / Tab Switching Detected'
 }, { timestamps: true });
 
 const Result = mongoose.model('Result', resultSchema);

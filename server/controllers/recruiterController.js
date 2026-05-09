@@ -7,7 +7,7 @@ const ResumeScore = require('../models/ResumeScore');
 // @access  Protected (Recruiter)
 const getResults = async (req, res) => {
   try {
-    const companyFilter = req.user.company ? { company: req.user.company } : { company: 'None' };
+    const companyFilter = req.user.company ? { company: req.user.company.toLowerCase() } : { company: 'none' };
     const results = await Result.find(companyFilter)
       .populate('candidate', 'name email profileType')
       .sort({ createdAt: -1 });

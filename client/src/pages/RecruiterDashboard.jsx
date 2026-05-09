@@ -193,7 +193,7 @@ const RecruiterDashboard = () => {
                             onClick={() => {
                               const resume = resumes.find(res => String(res.candidate) === String(r.candidate?._id));
                               if (resume) {
-                                window.open(`http://localhost:5000${resume.resumeFilePath}`, '_blank');
+                                window.open(`http://localhost:5000${encodeURI(resume.resumeFilePath)}`, '_blank');
                               } else {
                                 alert("Resume file not found for this candidate.");
                               }
@@ -214,13 +214,20 @@ const RecruiterDashboard = () => {
                           <span className="text-white font-mono">{r.score} / {r.totalQuestions}</span>
                         </td>
                         <td className="p-4">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                            r.status === 'Pass' 
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                              : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                          }`}>
-                            {r.status === 'Pass' ? 'Selected' : 'Rejected'}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span className={`w-fit px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                              r.status === 'Pass' 
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                            }`}>
+                              {r.status === 'Pass' ? 'Selected' : 'Rejected'}
+                            </span>
+                            {r.reason && (
+                              <span className="text-[9px] text-rose-400 font-bold uppercase tracking-tight italic">
+                                {r.reason}
+                              </span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -262,7 +269,7 @@ const RecruiterDashboard = () => {
                         </td>
                         <td className="p-4 flex gap-4">
                           <a 
-                            href={`http://localhost:5000${res.resumeFilePath}`} 
+                            href={`http://localhost:5000${encodeURI(res.resumeFilePath)}`} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-500/20 flex items-center gap-2 transition-all"
@@ -271,7 +278,7 @@ const RecruiterDashboard = () => {
                             Preview
                           </a>
                           <a 
-                            href={`http://localhost:5000${res.resumeFilePath}`} 
+                            href={`http://localhost:5000${encodeURI(res.resumeFilePath)}`} 
                             download 
                             className="bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-500/20 flex items-center gap-2 transition-all"
                           >

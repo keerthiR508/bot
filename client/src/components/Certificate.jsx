@@ -5,22 +5,6 @@ import jsPDF from 'jspdf';
 const Certificate = ({ candidateName, companyName, date }) => {
   const certificateRef = useRef();
 
-  const downloadCertificate = () => {
-    const input = certificateRef.current;
-    html2canvas(input, { 
-      scale: 3, // Higher scale for better quality
-      useCORS: true,
-      backgroundColor: '#ffffff'
-    }).then((canvas) => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('l', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${candidateName}_Recruitment_Certificate.pdf`);
-    });
-  };
-
   const displayCompany = !companyName || companyName === 'None' ? 'AI Recruitment Assistant' : companyName;
 
   return (
@@ -105,17 +89,10 @@ const Certificate = ({ candidateName, companyName, date }) => {
       <div className="flex gap-4 mt-10">
         <button 
           onClick={() => window.print()}
-          className="bg-slate-800 hover:bg-slate-700 text-white px-8 py-4 rounded-2xl font-bold transition-all border border-slate-700 flex items-center gap-3"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-4 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-600/20 flex items-center gap-3 scale-105"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2-2v4a2 2 0 002 2z" /></svg>
           Print Certificate
-        </button>
-        <button 
-          onClick={downloadCertificate}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-4 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-600/20 flex items-center gap-3 scale-105"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-          Download PDF
         </button>
       </div>
     </div>

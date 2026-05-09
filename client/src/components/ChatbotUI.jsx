@@ -55,6 +55,7 @@ const ChatbotUI = ({ user, externalMessages = [], onBotInstruction }) => {
       if (content.includes('[ENGLISH_TEST]')) onBotInstruction('ENGLISH_TEST');
       if (content.includes('[PRACTICE_MODE]')) onBotInstruction('PRACTICE_INTERVIEW');
       if (content.includes('[RESUME_UPLOAD]')) onBotInstruction('RESUME_UPLOAD');
+      if (content.includes('[START_REAL_INTERVIEW]')) onBotInstruction('START_REAL_INTERVIEW');
       
       const completedMatch = content.match(/\[INTERVIEW_COMPLETED:\s*(.*?)\]/);
       if (completedMatch && completedMatch[1]) {

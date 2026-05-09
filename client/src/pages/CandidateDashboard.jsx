@@ -1,7 +1,8 @@
-import { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import ChatbotUI from '../components/ChatbotUI';
+import Certificate from '../components/Certificate';
 
 const DEFAULT_QUESTIONS = {
   Aptitude: [
@@ -44,6 +45,12 @@ const CandidateDashboard = () => {
   const [isProcessingResume, setIsProcessingResume] = useState(false);
   const [atsResult, setAtsResult] = useState(null);
   const [finalStatus, setFinalStatus] = useState('SELECTED'); // 'SELECTED' or 'REJECTED'
+  const [certificateData, setCertificateData] = useState(null);
+
+  // Proctoring State
+  const [violationCount, setViolationCount] = useState(0);
+  const [isProctoringActive, setIsProctoringActive] = useState(false);
+  const [showProctoringWarning, setShowProctoringWarning] = useState(null);
 
   useEffect(() => {
     const loadRecruiterCompanies = async () => {
@@ -69,9 +76,7 @@ const CandidateDashboard = () => {
   }, [user?.token]);
 
   const handleBotInstruction = (instruction, data = null) => {
-    if (instruction === 'COMPANY_SELECTED') {
-      setSelectedCompany(data);
-      console.log("Selected Company:", data);
+    if (instruction === 'START_REAL_INTERVIEW') {
       setActiveAction('RESUME_UPLOAD');
       return;
     }
@@ -81,30 +86,12 @@ const CandidateDashboard = () => {
       return;
     }
 
-    if (instruction === 'INTERVIEW_COMPLETED') {
-      const status = data || 'SELECTED';
-      setFinalStatus(status);
-      console.log("Interview completed. Status:", status);
-      setActiveAction('INTERVIEW_COMPLETED');
-      return;
-    }
-
     if (instruction.includes('TEST')) {
-      if (!selectedCompany) {
-        setError('Please select a registered company first.');
-        return;
-      }
-      if (instruction === 'CODING_TEST' && user?.profileType !== 'IT') {
-        console.log("Skipping Coding Round: Candidate is Non-IT");
-        pushExternalMessage("[SYSTEM INJECTION]: Candidate profile is Non-IT. Skip Coding Round and move directly to English Test.");
-        setActiveAction(null);
-        return;
-      }
       setActiveAction(instruction);
       const type = instruction.split('_')[0];
-      let queryType = 'Aptitude';
-      if (type === 'CODING') queryType = 'Coding';
-      if (type === 'ENGLISH') queryType = 'English';
+      let queryType = 'aptitude';
+      if (type === 'CODING') queryType = 'coding';
+      if (type === 'ENGLISH') queryType = 'english';
       fetchQuestions(queryType);
       return;
     }
@@ -123,16 +110,13 @@ const CandidateDashboard = () => {
     setError('');
 
     // REQUIRED LOG: Selected company
-    console.log("Selected company:", selectedCompany);
+    console.log("Selected company for questions:", selectedCompany);
     
     // IF candidate selects "None": use built-in default questions (Practice Mode)
     if (selectedCompany === 'None' || !selectedCompany) {
-      const q = DEFAULT_QUESTIONS[type] || [];
+      const q = DEFAULT_QUESTIONS[type.charAt(0).toUpperCase() + type.slice(1)] || [];
       
-      // REQUIRED LOGS: Fetched questions per round
-      if (type === 'Aptitude') console.log("Fetched aptitude questions:", q);
-      if (type === 'Coding') console.log("Fetched coding questions:", q);
-      if (type === 'English') console.log("Fetched english questions:", q);
+      console.log(`[PRACTICE MODE] Fetched ${type} questions:`, q);
       
       setQuestions(q);
       setIsFetchingQuestions(false);
@@ -141,19 +125,33 @@ const CandidateDashboard = () => {
 
     try {
       // IF candidate selects a registered company: fetch recruiter questions ONLY from MongoDB
+      console.log(`[RECRUITER MODE] Fetching ${type} questions for ${selectedCompany} from MongoDB...`);
       const { data } = await axios.get(`/api/questions?type=${type}&company=${selectedCompany}`, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       
-      // REQUIRED LOGS: Fetched questions per round
-      if (type === 'Aptitude') console.log("Fetched aptitude questions:", data);
-      if (type === 'Coding') console.log("Fetched coding questions:", data);
-      if (type === 'English') console.log("Fetched english questions:", data);
+      console.log(`[DATABASE RESULT] Fetched ${type} questions:`, data);
 
       if (!data || data.length === 0) {
-        const errorMsg = "No questions have been prepared yet for this company.";
-        setError(errorMsg);
-        pushExternalMessage(`[SYSTEM INJECTION]: ${errorMsg}`);
+        console.log(`[DATABASE RESULT] No ${type} questions found for ${selectedCompany}, skipping round...`);
+        
+        // Skip to next round
+        if (type === 'aptitude') {
+          if (user?.profileType === 'IT') handleBotInstruction('CODING_TEST');
+          else handleBotInstruction('ENGLISH_TEST');
+        } else if (type === 'coding') {
+          handleBotInstruction('ENGLISH_TEST');
+        } else if (type === 'english') {
+          setFinalStatus('SELECTED');
+          setCertificateData({
+            candidateName: user.name,
+            companyName: selectedCompany,
+            date: new Date().toLocaleDateString()
+          });
+          setActiveAction('INTERVIEW_COMPLETED');
+        }
+        
+        setIsFetchingQuestions(false);
         return;
       }
 
@@ -163,6 +161,104 @@ const CandidateDashboard = () => {
       setError('Failed to fetch questions from database.');
     } finally {
       setIsFetchingQuestions(false);
+    }
+  };
+
+  // Proctoring Logic
+  const startProctoring = async () => {
+    setIsProctoringActive(true);
+    
+    // Mandatory Fullscreen
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error("Fullscreen request failed:", err);
+      });
+    }
+
+    console.log("Proctoring Started: Fullscreen & Activity Monitoring Active");
+  };
+
+  const stopProctoring = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(err => console.error("Exit fullscreen failed:", err));
+    }
+    setIsProctoringActive(false);
+  };
+
+  useEffect(() => {
+    if (!isProctoringActive) return;
+
+    const handleViolation = (type = "Unknown") => {
+      console.warn(`Proctoring Violation [${type}] detected.`);
+      setViolationCount(prev => {
+        const next = prev + 1;
+        if (next === 1) setShowProctoringWarning("Warning 1: Tab switching detected. Please stay on interview screen.");
+        if (next === 2) setShowProctoringWarning("Warning 2: Suspicious activity detected. One more violation may lead to failure.");
+        if (next === 3) setShowProctoringWarning("Final Warning: Do not switch tabs again.");
+        if (next >= 4) {
+          terminateDueToCheating();
+        }
+        return next;
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) handleViolation("TAB_SWITCH_HIDDEN");
+    };
+
+    const handleBlur = () => {
+      handleViolation("WINDOW_BLUR");
+    };
+
+    const handleFocus = () => {
+      console.log("Window focused back");
+    };
+
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && isProctoringActive) {
+        handleViolation("FULLSCREEN_EXIT");
+      }
+    };
+
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = ''; // Required for Chrome
+      handleViolation("ATTEMPTED_CLOSE");
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isProctoringActive]);
+
+  const terminateDueToCheating = async () => {
+    stopProctoring();
+    setFinalStatus('REJECTED');
+    setActiveAction('INTERVIEW_COMPLETED');
+    
+    // Log violation to backend
+    try {
+      await axios.post('/api/candidate/submit-answers', {
+        roundName: activeAction.split('_')[0],
+        answers: [],
+        company: selectedCompany,
+        status: 'Fail',
+        reason: 'Cheating / Tab Switching Detected'
+      }, {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+    } catch (err) {
+      console.error("Failed to log cheating violation:", err);
     }
   };
 
@@ -189,12 +285,9 @@ const CandidateDashboard = () => {
       const score = data.score ?? 5;
       setAtsResult({ score });
       
-      // Show score for 3 seconds then continue to Aptitude
-      setTimeout(() => {
-        setAtsResult(null);
-        handleBotInstruction('APTITUDE_TEST');
-      }, 3000);
-
+      // Automatically load the first test module
+      handleBotInstruction('APTITUDE_TEST');
+      startProctoring();
     } catch (err) {
       console.error("Resume Error:", err);
       const msg = err.response?.data?.message || 'Failed to process resume';
@@ -243,7 +336,29 @@ const CandidateDashboard = () => {
         const status = score >= Math.ceil(total / 2) ? 'Pass' : 'Fail';
         
         pushExternalMessage(`[ROUND_COMPLETED]: ${roundName}, Score: ${score}, Total: ${total}, Result: ${status.toUpperCase()}`);
-        setActiveAction(null);
+        
+        if (status === 'Fail') {
+          setFinalStatus('REJECTED');
+          stopProctoring();
+          setActiveAction('INTERVIEW_COMPLETED');
+        } else {
+          // Trigger next round
+          if (roundName === 'Aptitude') {
+            if (user?.profileType === 'IT') handleBotInstruction('CODING_TEST');
+            else handleBotInstruction('ENGLISH_TEST');
+          } else if (roundName === 'Coding') {
+            handleBotInstruction('ENGLISH_TEST');
+          } else if (roundName === 'English') {
+            setFinalStatus('SELECTED');
+            setCertificateData({
+              candidateName: user.name,
+              companyName: selectedCompany,
+              date: new Date().toLocaleDateString()
+            });
+            stopProctoring();
+            setActiveAction('INTERVIEW_COMPLETED');
+          }
+        }
         return;
       }
 
@@ -257,7 +372,29 @@ const CandidateDashboard = () => {
       });
 
       pushExternalMessage(`[ROUND_COMPLETED]: ${roundName}, Score: ${data.score}, Total: ${data.totalQuestions}, Result: ${data.status.toUpperCase()}`);
-      setActiveAction(null);
+      
+      if (data.status === 'Fail') {
+        setFinalStatus('REJECTED');
+        stopProctoring();
+        setActiveAction('INTERVIEW_COMPLETED');
+      } else {
+        // Trigger next round
+        if (roundName === 'Aptitude') {
+          if (user?.profileType === 'IT') handleBotInstruction('CODING_TEST');
+          else handleBotInstruction('ENGLISH_TEST');
+        } else if (roundName === 'Coding') {
+          handleBotInstruction('ENGLISH_TEST');
+        } else if (roundName === 'English') {
+          setFinalStatus('SELECTED');
+          setCertificateData({
+            candidateName: user.name,
+            companyName: selectedCompany,
+            date: new Date().toLocaleDateString()
+          });
+          stopProctoring();
+          setActiveAction('INTERVIEW_COMPLETED');
+        }
+      }
     } catch (err) {
       console.error("Submit Error:", err);
       setError('Failed to submit answers');
@@ -347,117 +484,155 @@ const CandidateDashboard = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] bg-slate-900 flex p-6 gap-6">
-      <div className={`transition-all duration-500 ease-in-out ${activeAction ? 'w-1/2' : 'w-full max-w-4xl mx-auto'}`}>
-        <ChatbotUI
-          user={user}
-          externalMessages={externalMessages}
-          onBotInstruction={handleBotInstruction}
-        />
-      </div>
+    <div className="h-[calc(100vh-4rem)] bg-slate-900 flex p-6 gap-6 justify-center relative">
+      
+      {/* Proctoring Warning Modal */}
+      {showProctoringWarning && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border-2 border-red-500 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl animate-in zoom-in duration-300">
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            </div>
+            <h3 className="text-2xl font-black text-white mb-4 uppercase tracking-tight">Proctoring Alert</h3>
+            <p className="text-slate-300 mb-8 font-medium text-lg leading-relaxed">{showProctoringWarning}</p>
+            <button 
+              onClick={() => setShowProctoringWarning(null)}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-red-600/20"
+            >
+              I Understand
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Active Proctoring Indicator */}
+      {isProctoringActive && (
+        <div className="fixed bottom-10 right-10 flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-xl border border-indigo-500 shadow-2xl z-50">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+          <span className="text-xs font-bold text-white uppercase tracking-wider">Activity Monitoring Active</span>
+        </div>
+      )}
+      
+      {!activeAction && (
+        <div className="w-full max-w-4xl mx-auto transition-all duration-500 ease-in-out">
+          <ChatbotUI
+            user={user}
+            externalMessages={externalMessages}
+            onBotInstruction={handleBotInstruction}
+          />
+        </div>
+      )}
 
       {activeAction && (
-        <div className="w-1/2 flex flex-col h-full animate-in slide-in-from-right duration-500">
-          <div className="bg-slate-800 rounded-2xl shadow-xl border border-slate-700 flex-1 overflow-hidden flex items-center justify-center p-6">
-            {activeAction === 'RESUME_UPLOAD' && (
+        <div className="flex flex-col h-full w-full max-w-5xl mx-auto animate-in slide-in-from-right duration-500">
+          
+          {atsResult && (
+             <div className="bg-slate-800 p-6 rounded-2xl mb-6 shadow-xl border border-slate-700 flex justify-between items-center animate-in fade-in slide-in-from-top-4 duration-500">
+                 <div>
+                    <h2 className="text-white text-2xl font-black mb-1">Assessment Phase</h2>
+                    <p className="text-indigo-300 font-medium">Target Company: <span className="text-white">{selectedCompany === 'None' ? 'General Mode' : selectedCompany}</span></p>
+                 </div>
+                 <div className="bg-emerald-500/10 px-6 py-3 rounded-xl border border-emerald-500/20 flex items-center gap-3">
+                    <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <div>
+                      <p className="text-emerald-400/80 text-xs uppercase font-bold tracking-wider">ATS Score</p>
+                      <span className="text-emerald-400 font-black text-xl">{atsResult.score}/10</span>
+                    </div>
+                 </div>
+             </div>
+          )}
+
+          <div className="bg-slate-800 rounded-2xl shadow-xl border border-slate-700 flex-1 overflow-y-auto p-6">
+            <div className="min-h-full flex flex-col items-center justify-center w-full">
+            {activeAction === 'RESUME_UPLOAD' && !atsResult && (
               <div className="w-full max-w-md">
-                {atsResult ? (
-                  <div className="text-center animate-in zoom-in duration-500">
-                    <div className="w-24 h-24 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-emerald-500">
-                      <span className="text-3xl font-bold text-emerald-400">{atsResult.score}</span>
-                    </div>
-                    <h3 className="text-2xl font-bold text-white mb-2">Resume Uploaded Successfully</h3>
-                    <p className="text-emerald-400 text-lg font-bold mb-4">ATS Score: {atsResult.score}/10</p>
-                    <div className="h-1 w-full bg-slate-700 rounded-full overflow-hidden mb-4">
-                      <div className="h-full bg-indigo-500 animate-progress"></div>
-                    </div>
-                    <p className="text-slate-400 animate-pulse">Continuing to Aptitude Round...</p>
+                <h3 className="text-2xl font-bold text-white mb-2 text-center">Step 1: Upload Resume</h3>
+                <p className="text-slate-400 mb-8 text-center text-xs italic">Upload your resume to begin the recruitment evaluation.</p>
+                
+                {error && <div className="bg-red-500/20 text-red-400 p-3 rounded mb-4 text-sm text-center border border-red-500/30">{error}</div>}
+                
+                <form onSubmit={handleResumeSubmit} className="space-y-6">
+                  <div className="mb-6">
+                    <label className="block text-slate-400 text-xs uppercase font-bold tracking-widest mb-3">1. Select Target Company</label>
+                    <select
+                      value={selectedCompany}
+                      onChange={(e) => setSelectedCompany(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-indigo-500 transition-all text-lg font-semibold"
+                      disabled={isProcessingResume}
+                    >
+                      <option value="None">None (Practice Mode)</option>
+                      {companies.map((company) => (
+                        <option key={company} value={company}>
+                          {company}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                ) : (
-                  <>
-                    <h3 className="text-2xl font-bold text-white mb-2 text-center">Upload Resume</h3>
-                    <p className="text-indigo-400 mb-2 text-center text-sm font-medium">Target Company: {selectedCompany || 'None'}</p>
-                    <p className="text-slate-400 mb-8 text-center text-xs italic">Please upload your resume to proceed with the recruitment process.</p>
-                    
-                    {error && <div className="bg-red-500/20 text-red-400 p-3 rounded mb-4 text-sm text-center border border-red-500/30">{error}</div>}
-                    
-                    <div className="mb-6">
-                      <label className="block text-slate-400 text-xs uppercase font-bold tracking-widest mb-3">1. Select Company</label>
-                      <select
-                        value={selectedCompany}
-                        onChange={(e) => setSelectedCompany(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500 transition-all"
+
+                  <div className="mb-2">
+                    <label className="block text-slate-400 text-xs uppercase font-bold tracking-widest mb-3">2. Choose Resume (PDF Only)</label>
+                    <div className="border-2 border-dashed border-slate-600 rounded-xl p-10 text-center hover:border-indigo-500 hover:bg-slate-700/50 transition-all cursor-pointer relative">
+                      <input
+                        type="file"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        accept=".pdf"
+                        required
                         disabled={isProcessingResume}
-                      >
-                        <option value="None">None (Practice Mode)</option>
-                        {companies.map((company) => (
-                          <option key={company} value={company}>
-                            {company}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <form onSubmit={handleResumeSubmit} className="space-y-6">
-                      <div className="mb-2">
-                        <label className="block text-slate-400 text-xs uppercase font-bold tracking-widest mb-3">2. Choose Resume (PDF Only)</label>
-                        <div className="border-2 border-dashed border-slate-600 rounded-xl p-8 text-center hover:border-indigo-500 hover:bg-slate-700/50 transition-all cursor-pointer relative">
-                          <input
-                            type="file"
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            accept=".pdf"
-                            required
-                            disabled={isProcessingResume}
-                            onChange={(event) => {
-                              setSelectedResumeFile(event.target.files?.[0] || null);
-                              setError('');
-                            }}
-                          />
-                          <svg className="mx-auto h-12 w-12 text-slate-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                          <div className="mt-4 text-sm text-slate-400">
-                            <span className="font-medium text-indigo-400">Click to upload</span> or drag and drop
-                          </div>
-                          {selectedResumeFile && (
-                            <p className="text-sm text-emerald-400 mt-2 font-bold">Selected: {selectedResumeFile.name}</p>
-                          )}
-                        </div>
+                        onChange={(event) => {
+                          setSelectedResumeFile(event.target.files?.[0] || null);
+                          setError('');
+                        }}
+                      />
+                      <svg className="mx-auto h-16 w-16 text-slate-400 mb-4" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <div className="text-lg text-slate-400">
+                        <span className="font-bold text-indigo-400">Click to upload PDF</span>
                       </div>
+                      {selectedResumeFile && (
+                        <p className="text-emerald-400 mt-4 font-black">File: {selectedResumeFile.name}</p>
+                      )}
+                    </div>
+                  </div>
 
-                      <button 
-                        type="submit" 
-                        disabled={isProcessingResume || !selectedResumeFile}
-                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-4 rounded-xl shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-3"
-                      >
-                        {isProcessingResume ? (
-                          <>
-                            <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
-                            Processing Resume...
-                          </>
-                        ) : (
-                          'Process Resume'
-                        )}
-                      </button>
-                    </form>
-                  </>
-                )}
+                  <button 
+                    type="submit" 
+                    disabled={isProcessingResume || !selectedResumeFile}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 px-4 rounded-2xl shadow-xl shadow-indigo-600/20 transition-all disabled:opacity-50 flex items-center justify-center gap-3 text-lg"
+                  >
+                    {isProcessingResume ? (
+                      <>
+                        <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                        Analyzing Resume...
+                      </>
+                    ) : (
+                      'Analyze Resume & Get ATS Score'
+                    )}
+                  </button>
+                </form>
               </div>
             )}
             {activeAction === 'APTITUDE_TEST' && renderQuiz('Aptitude')}
             {activeAction === 'CODING_TEST' && renderQuiz('Coding')}
             {activeAction === 'ENGLISH_TEST' && renderQuiz('English')}
             {activeAction === 'PRACTICE_INTERVIEW' && (
-              <div className="w-full h-full flex flex-col">
+              <div className="w-full w-full min-h-[75vh] flex flex-col relative border border-slate-700 rounded-2xl overflow-hidden shadow-2xl">
                 <div className="p-4 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
                   <h3 className="text-xl font-bold text-white flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse"></span>
                     Jotform Practice Assistant
                   </h3>
+                  <button 
+                    onClick={() => handleBotInstruction('START_REAL_INTERVIEW')}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg transition-all text-sm flex items-center gap-2"
+                  >
+                    Proceed to Resume Upload
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                  </button>
                 </div>
                 <iframe
                   src="https://www.jotform.com/agent/019ae04746607d0a83b80ed512da45b42a83"
-                  className="w-full flex-1 border-0 rounded-b-2xl"
+                  className="w-full flex-1 min-h-[600px] border-0 bg-white"
                   title="Practice Agent"
                   allow="microphone"
                 />
@@ -471,24 +646,22 @@ const CandidateDashboard = () => {
                       <svg className="w-10 h-10 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                     </div>
                     <h2 className="text-3xl font-black text-white mb-4">Congratulations!</h2>
-                    <p className="text-slate-300 text-lg mb-8 leading-relaxed">
-                      You have successfully completed the AI Recruitment Process.
+                    <p className="text-slate-300 text-lg mb-8 leading-relaxed font-bold">
+                      You are selected.
                     </p>
                     <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-700 mb-8">
                       <p className="text-emerald-400 font-black text-xl mb-1 uppercase tracking-widest">Final Result: SELECTED</p>
                       <p className="text-slate-400 text-sm">Company: <span className="text-white font-bold">{selectedCompany === 'None' ? 'AI Recruitment Assistant' : selectedCompany}</span></p>
                     </div>
-                    <p className="text-slate-300 mb-4 font-medium">You can now generate and download your certificate here:</p>
-                    <a 
-                      href="https://achievement-hub-143.preview.emergentagent.com/" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 px-10 rounded-2xl shadow-xl shadow-indigo-600/20 transition-all transform hover:scale-105 text-lg"
-                    >
-                      Download Certificate
-                    </a>
+                    <p className="text-slate-300 mb-8 font-medium">Your achievement has been recorded. You can view and download your certificate below:</p>
+                    
+                    <div className="flex justify-center mb-8 transform scale-90">
+                      <Certificate {...certificateData} />
+                    </div>
+
                     <div className="mt-8 pt-6 border-t border-slate-700">
-                      <p className="text-xs text-slate-500 font-mono break-all">https://achievement-hub-143.preview.emergentagent.com/</p>
+                      <p className="text-slate-400 text-sm mb-2">Alternative Link:</p>
+                      <p className="text-xs text-slate-500 font-mono break-all">https://chic-stardust-2b5e95.netlify.app/</p>
                     </div>
                   </>
                 ) : (
@@ -496,12 +669,15 @@ const CandidateDashboard = () => {
                     <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-red-500">
                       <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
                     </div>
-                    <h2 className="text-3xl font-black text-white mb-4">Interview Process Completed</h2>
-                    <p className="text-slate-300 text-lg mb-8 leading-relaxed">
-                      Thank you for your time and effort during the recruitment process.
+                    <h2 className="text-3xl font-black text-white mb-4">Interview Ended</h2>
+                    <p className="text-slate-300 text-lg mb-8 leading-relaxed font-bold">
+                      {violationCount >= 4 ? "Interview Failed Due To Multiple Tab Switching Violations." : "Unfortunately, you are failed."}
                     </p>
                     <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-700 mb-8">
                       <p className="text-red-400 font-black text-xl mb-1 uppercase tracking-widest">Final Result: NOT SELECTED</p>
+                      {violationCount >= 4 && (
+                        <p className="text-red-400/80 text-xs font-bold mt-2 uppercase tracking-widest">Reason: Cheating / Tab Switching Detected</p>
+                      )}
                       <p className="text-slate-400 text-sm italic mt-2">Better luck next time!</p>
                     </div>
                     <p className="text-slate-400 text-sm px-4">
@@ -511,6 +687,7 @@ const CandidateDashboard = () => {
                 )}
               </div>
             )}
+            </div>
           </div>
         </div>
       )}

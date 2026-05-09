@@ -4,3 +4,7 @@ dist/
 build/
 .DS_Store
 *.log
+server/uploads/
+server/node_modules/
+client/node_modules/
+.vscode/
