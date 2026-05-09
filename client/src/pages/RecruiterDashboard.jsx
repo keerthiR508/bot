@@ -8,9 +8,7 @@ const RecruiterDashboard = () => {
   const [activeTab, setActiveTab] = useState('results'); // results, questions, live
   const [results, setResults] = useState([]);
   const [questions, setQuestions] = useState([]);
-  const [resumes, setResumes] = useState([]);
   const [externalMessages, setExternalMessages] = useState([]);
-  const [selectedResumeUrl, setSelectedResumeUrl] = useState(null);
 
   
   // New question form state
@@ -24,7 +22,6 @@ const RecruiterDashboard = () => {
   useEffect(() => {
     if (activeTab === 'results') fetchResults();
     if (activeTab === 'questions') fetchQuestions();
-    if (activeTab === 'resumes') fetchResumes();
   }, [activeTab]);
 
   const fetchResults = async () => {
@@ -38,16 +35,7 @@ const RecruiterDashboard = () => {
     }
   };
 
-  const fetchResumes = async () => {
-    try {
-      const { data } = await axios.get('/api/recruiter/resumes', {
-        headers: { Authorization: `Bearer ${user.token}` }
-      });
-      setResumes(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+
 
   const fetchQuestions = async () => {
     try {
@@ -127,21 +115,8 @@ const RecruiterDashboard = () => {
       if (lower.includes('english')) setQType('English');
     } else if (lower.includes('view candidate results')) {
       setActiveTab('results');
-    } else if (lower.includes('view uploaded resumes')) {
-      setActiveTab('resumes');
     }
   };
-
-  const handlePrint = (url) => {
-    const fullUrl = url.startsWith('http') ? url : `https://bot-c47w.onrender.com${encodeURI(url)}`;
-    const printWindow = window.open(fullUrl, '_blank');
-    if (printWindow) {
-      printWindow.onload = () => {
-        printWindow.print();
-      };
-    }
-  };
-
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-slate-900 flex">
@@ -165,7 +140,6 @@ const RecruiterDashboard = () => {
         {/* Navigation Tabs (if manual override needed) */}
         <div className="flex gap-4 mb-8">
           <button onClick={() => setActiveTab('results')} className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'results' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Results</button>
-          <button onClick={() => setActiveTab('resumes')} className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'resumes' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Resumes</button>
           <button onClick={() => setActiveTab('questions')} className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'questions' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Questions Bank</button>
         </div>
 
@@ -182,7 +156,6 @@ const RecruiterDashboard = () => {
                     <th className="p-4 font-medium text-xs uppercase tracking-wider">Candidate Name</th>
                     <th className="p-4 font-medium text-xs uppercase tracking-wider">Email</th>
                     <th className="p-4 font-medium text-xs uppercase tracking-wider">Profile</th>
-                    <th className="p-4 font-medium text-xs uppercase tracking-wider">Resume</th>
                     <th className="p-4 font-medium text-xs uppercase tracking-wider">Round</th>
                     <th className="p-4 font-medium text-xs uppercase tracking-wider">Score</th>
                     <th className="p-4 font-medium text-xs uppercase tracking-wider">Status</th>
@@ -190,7 +163,7 @@ const RecruiterDashboard = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-700">
                   {results.length === 0 ? (
-                    <tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">No candidate results available for your company.</td></tr>
+                    <tr><td colSpan="6" className="p-8 text-center text-slate-500 italic">No candidate results available for your company.</td></tr>
                   ) : (
                     results.map((r) => (
                       <tr key={r._id} className="hover:bg-slate-700/30 transition-colors group">
@@ -200,22 +173,6 @@ const RecruiterDashboard = () => {
                           <span className="bg-slate-900 text-indigo-300 px-2.5 py-1 rounded-md text-[10px] font-bold border border-slate-700 uppercase">
                             {r.candidate?.profileType || 'N/A'}
                           </span>
-                        </td>
-                        <td className="p-4">
-                          <button 
-                            onClick={() => {
-                              const resume = resumes.find(res => String(res.candidate) === String(r.candidate?._id));
-                              if (resume) {
-                                setSelectedResumeUrl(resume.resumeFilePath.startsWith('http') ? resume.resumeFilePath : `http://localhost:3001${encodeURI(resume.resumeFilePath)}`);
-                              } else {
-                                alert("Resume file not found for this candidate.");
-                              }
-                            }}
-                            className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 text-xs font-semibold group-hover:translate-x-1 transition-transform"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            View & Print
-                          </button>
                         </td>
                         <td className="p-4">
                           <div className="flex flex-col">
@@ -241,53 +198,6 @@ const RecruiterDashboard = () => {
                               </span>
                             )}
                           </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'resumes' && (
-          <div className="animate-in slide-in-from-bottom-4 duration-500">
-            <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-              <svg className="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              Candidate Resumes
-            </h3>
-            <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-lg">
-              <table className="w-full text-left text-slate-300">
-                <thead className="bg-slate-900/50 text-slate-400">
-                  <tr>
-                    <th className="p-4 font-medium text-xs uppercase tracking-wider">Candidate Name</th>
-                    <th className="p-4 font-medium text-xs uppercase tracking-wider">Email</th>
-                    <th className="p-4 font-medium text-xs uppercase tracking-wider">ATS Score</th>
-                    <th className="p-4 font-medium text-xs uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700">
-                  {resumes.length === 0 ? (
-                    <tr><td colSpan="4" className="p-8 text-center text-slate-500 italic">No resumes uploaded for your company yet.</td></tr>
-                  ) : (
-                    resumes.map((res) => (
-                      <tr key={res._id} className="hover:bg-slate-700/30 transition-colors">
-                        <td className="p-4 font-semibold text-white">{res.candidateName}</td>
-                        <td className="p-4 text-slate-400">{res.candidateEmail}</td>
-                        <td className="p-4">
-                          <span className={`font-mono font-bold ${res.score >= 5 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {res.score} / 10
-                          </span>
-                        </td>
-                        <td className="p-4 flex gap-4">
-                          <button 
-                            onClick={() => setSelectedResumeUrl(res.resumeFilePath.startsWith('http') ? res.resumeFilePath : `http://localhost:3001${encodeURI(res.resumeFilePath)}`)}
-                            className="bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-500/20 flex items-center gap-2 transition-all"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            View & Print
-                          </button>
                         </td>
                       </tr>
                     ))
@@ -361,42 +271,6 @@ const RecruiterDashboard = () => {
                     <p className="text-slate-500 text-lg">No questions found in the bank.</p>
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Resume Viewer Modal */}
-        {selectedResumeUrl && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-5xl h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-4 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <svg className="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                  Candidate Resume
-                </h3>
-                <div className="flex gap-4">
-                  <button 
-                    onClick={() => handlePrint(selectedResumeUrl)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg transition-all text-sm flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H9a2 2 0 00-2 2v3a2 2 0 002 2zm0 0l-4-4m4 4l4-4m-4 4V4" /></svg>
-                    Print Resume
-                  </button>
-                  <button 
-                    onClick={() => setSelectedResumeUrl(null)}
-                    className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-xl transition-all"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-              <div className="flex-1 bg-white">
-                <iframe 
-                  src={selectedResumeUrl} 
-                  className="w-full h-full border-0"
-                  title="Resume Viewer"
-                />
               </div>
             </div>
           </div>
